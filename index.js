@@ -1,21 +1,43 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
+const readline = require("readline");
 
-const getHtml = async (nickname = "z1존짱지민") => {
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
+
+let input = "";
+
+rl.on("line", (line) => {
+  input = line;
+  rl.close();
+});
+
+rl.on("close", () => {
+  getHtml(input);
+});
+
+const getHtml = async (nickname) => {
+  const url = `https://maple.gg/u/${nickname}`;
   try {
-    const html = await axios.get(`https://maple.gg/u/${nickname}`);
+    const html = await axios.get(url);
     let user = {};
     const $ = cheerio.load(html.data);
     const bodyList = $("div.user-profile");
     // console.log(bodyList)
     bodyList.map((i, element) => {
       user = {
-        level: $(element)
+        server: $(element)
           .find("div.user-detail li.user-summary-item:first-child")
           .text()
           .replace(/\s/g, ""),
-        job: $(element)
+        level: $(element)
           .find("div.user-detail li.user-summary-item:nth-child(2)")
+          .text()
+          .replace(/\s/g, ""),
+        job: $(element)
+          .find("div.user-detail li.user-summary-item:nth-child(3)")
           .text()
           .replace(/\s/g, ""),
         nickname: $(element)
@@ -40,10 +62,11 @@ const getHtml = async (nickname = "z1존짱지민") => {
           .replace(/\s/g, ""),
       };
     });
-    console.log("userInfo : ", user);
+    if (!!user) {
+      console.log("userInfo : ", user);
+      return;
+    }
   } catch (error) {
     console.error(error);
   }
 };
-
-getHtml();
