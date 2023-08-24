@@ -1,6 +1,15 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
 const readline = require("readline");
+const { BsmOauth, BsmOauthError, BsmOauthErrorType, BsmUserRole, BsmStudentResource, BsmTeacherResource } = require("bsm-oauth");
+
+
+const bsmOauth = new BsmOauth(
+  process.env.BSM_AUTH_CLIENT_ID,
+  process.env.BSM_AUTH_CLIENT_SECRET
+);
+
+console.log(bsmOauth);
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -62,10 +71,11 @@ const getHtml = async (nickname) => {
           .replace(/\s/g, ""),
       };
     });
-    if (!!user) {
+    if (Object.keys(user).length !== 0) {
       console.log("userInfo : ", user);
       return;
     }
+    console.log("유저 정보가 없습니다");
   } catch (error) {
     console.error(error);
   }
