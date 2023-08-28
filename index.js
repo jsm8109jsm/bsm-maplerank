@@ -1,85 +1,62 @@
-const axios = require("axios");
-const cheerio = require("cheerio");
-const readline = require("readline");
 require("dotenv").config(); // dotenv 설정
-const {
-  BsmOauth,
-  BsmOauthError,
-  BsmOauthErrorType,
-  BsmUserRole,
-  BsmStudentResource,
-  BsmTeacherResource,
-} = require("bsm-oauth");
+const getHtml = require("./utils/getHtml");
+const mongoose = require("mongoose"); // mongoose를 사용하여 MongoDB 연결
+const UserInfoModel = require("./models/userInfo"); // UserInfo 모델을 임포트
 
 const express = require("express");
 const app = express();
 const port = 3000;
-let userInfo = {};
+const { MONGO_URI } = process.env;
+
+mongoose
+  .connect(MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    dbName: "bsm-maple-rank",
+  })
+  .then(() => console.log("mongodb connected"))
+  .catch((error) => console.error(error));
 
 app.get("/api/search", async (req, res) => {
-  await getHtml(req.query.nickname);
-  res.json(userInfo);
+  const userInfo = await getHtml(req.query.nickname);
+  if (userInfo !== null) {
+    const newUser = new UserInfoModel(userInfo);
+    newUser
+      .save()
+      .then(() => {
+        console.log("데이터가 MongoDB에 성공적으로 저장되었습니다.");
+        res.json(userInfo);
+      })
+      .catch((error) => {
+        console.error("데이터 저장 중 오류 발생:", error);
+        res.status(500).json({ error: "데이터 저장 중 오류 발생" });
+      });
+  } else {
+    res.status(404).json({ error: "유저 정보를 찾을 수 없습니다." });
+  }
+});
+
+const sortBy = {
+  LEVEL: { level: -1, level_persent: -1 },
+  MULENG: { muleng_floor: -1, muleng_minute: 1, muleng_second: 1 },
+};
+
+app.get("/api/rank", (req, res) => {
+  UserInfoModel.find({})
+    .sort(sortBy[req.query.sortBy])
+    .then((result) => {
+      console.log("정렬된 결과:");
+      console.log(result);
+      res.json(result);
+
+      mongoose.connection.close();
+    })
+    .catch((error) => {
+      console.error("데이터 저장 중 오류 발생:", error);
+      res.status(500).json({ error: "데이터 저장 중 오류 발생" });
+    });
 });
 
 app.listen(port, () => {
   console.log(`server is listening at localhost:3000`);
 });
-
-const bsmOauth = new BsmOauth(
-  process.env.BSM_AUTH_CLIENT_ID,
-  process.env.BSM_AUTH_CLIENT_SECRET
-);
-
-// console.log(process.env.BSM_AUTH_CLIENT_ID, process.env.BSM_AUTH_CLIENT_SECRET);
-
-const getHtml = async (nickname) => {
-  const url = `https://maple.gg/u/${nickname}`;
-  try {
-    const html = await axios.get(url);
-    const $ = cheerio.load(html.data);
-    const bodyList = $("div.user-profile");
-    bodyList.map((i, element) => {
-      userInfo = {
-        server: $(element)
-          .find("div.user-detail li.user-summary-item:first-child")
-          .text()
-          .replace(/\s/g, ""),
-        level: $(element)
-          .find("div.user-detail li.user-summary-item:nth-child(2)")
-          .text()
-          .replace(/\s/g, ""),
-        job: $(element)
-          .find("div.user-detail li.user-summary-item:nth-child(3)")
-          .text()
-          .replace(/\s/g, ""),
-        nickname: $(element)
-          .find("div.user-detail h3 b.align-middle")
-          .text()
-          .replace(/\s/g, ""),
-        imageUrl: $(element).find("img.character-image").attr("src"),
-      };
-    });
-
-    const muleng = $("div.col-lg-3.col-6.mt-3.px-1:first-child");
-    muleng.map((i, element) => {
-      userInfo = {
-        ...userInfo,
-        muleng_floor: $(element)
-          .find("h1.user-summary-floor.font-weight-bold")
-          .text()
-          .replace(/\s/g, ""),
-        muleng_time: $(element)
-          .find("small.user-summary-duration")
-          .text()
-          .replace(/\s/g, ""),
-      };
-    });
-    if (Object.keys(userInfo).length !== 0) {
-      console.log("userInfo : ", userInfo);
-      return;
-    }
-    console.log("유저 정보가 없습니다");
-  } catch (error) {
-    console.error(error);
-  }
-};
