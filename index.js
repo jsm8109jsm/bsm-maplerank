@@ -19,6 +19,11 @@ mongoose
 
 app.get("/api/search", async (req, res) => {
   const userInfo = await getHtml(req.query.nickname);
+  res.json(userInfo);
+});
+
+app.post("/api/rank", (req, res) => {
+  const userInfo = req.body;
   if (userInfo !== null) {
     const newUser = new UserInfoModel(userInfo);
     newUser
